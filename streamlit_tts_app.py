@@ -138,13 +138,13 @@ def main():
         # API Configuration
         endpoint = st.text_input(
             "API Endpoint",
-            value="https://sener-mcryr3zf-eastus2.openai.azure.com/openai/deployments/gpt-4o-mini-tts/audio/speech?api-version=2025-03-01-preview",
+            value=st.secrets.get("AZURE_TTS_ENDPOINT", "https://sener-mcryr3zf-eastus2.openai.azure.com/openai/deployments/gpt-4o-mini-tts/audio/speech?api-version=2025-03-01-preview"),
             type="default"
         )
         
         api_key = st.text_input(
             "API Key",
-            value="FLF9WIzEk4XuP61sqWHbG9a8P8wzsOSkgPdXKpDeBqyTMLaEXL2QJQQJ99BGACHYHv6XJ3w3AAAAACOGSuop",
+            value=st.secrets.get("AZURE_API_KEY", ""),
             type="password"
         )
         
