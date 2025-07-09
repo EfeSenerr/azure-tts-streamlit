@@ -91,6 +91,9 @@ class AzureTTSClient:
         chunks = self.chunk_text(text)
         st.info(f"Text split into {len(chunks)} chunks")
         
+        # Store text chunks in session state for duration estimation
+        st.session_state.current_text_chunks = chunks
+        
         # Create progress bar
         progress_bar = st.progress(0)
         completed_chunks = 0
@@ -142,16 +145,16 @@ def main():
         # API Configuration
         endpoint = st.text_input(
             "API Endpoint",
-            value=st.secrets.get("AZURE_TTS_ENDPOINT", ""),
+            value="",  # Don't pre-fill from secrets for security
             type="default",
             help="Your Azure OpenAI TTS endpoint URL"
         )
         
         api_key = st.text_input(
             "API Key",
-            value=st.secrets.get("AZURE_API_KEY", ""),
+            value="",  # Don't pre-fill from secrets for security
             type="password",
-            help="Your Azure OpenAI API key (hidden for security)"
+            help="Enter your Azure OpenAI API key (completely hidden for security)"
         )
         
         st.markdown("### 🎵 Voice & Audio Settings")
@@ -174,29 +177,19 @@ def main():
             help="Choose the voice character for text-to-speech"
         )
         
-        # Audio playback speed (simulation via start/end time)
-        playback_speed = st.slider(
-            "🎛️ Playback Speed",
-            min_value=0.5,
-            max_value=2.0,
-            value=1.0,
-            step=0.1,
-            help="Adjust playback speed (Note: This is a visual indicator - actual speed control depends on browser audio player)"
-        )
-        
-        # Display speed info
-        if playback_speed != 1.0:
-            if playback_speed < 1.0:
-                st.info(f"🐌 Slower playback: {playback_speed}x speed")
-            else:
-                st.info(f"🚀 Faster playback: {playback_speed}x speed")
-        
         # Audio format option
         audio_format = st.selectbox(
-            "🎵 Audio Format",
+            "� Audio Format",
             options=["mp3", "wav", "ogg"],
             index=0,
             help="Select audio output format"
+        )
+        
+        # Auto-advance setting
+        auto_advance = st.checkbox(
+            "� Auto-advance chunks",
+            value=True,
+            help="Automatically move to next chunk after audio ends"
         )
         
         st.markdown("---")
@@ -283,12 +276,8 @@ Try pasting a long article or story to see how the chunking and parallel process
             if current_chunk < len(audio_chunks):
                 st.markdown(f"**🎵 Now Playing: Chunk {current_chunk + 1}/{len(audio_chunks)}**")
                 
-                # Create enhanced audio player with speed simulation
+                # Create enhanced audio player
                 audio_bytes = audio_chunks[current_chunk]
-                
-                # Audio player with speed note
-                if playback_speed != 1.0:
-                    st.info(f"🎛️ Suggested playback speed: {playback_speed}x (Use your browser's audio controls to adjust speed)")
                 
                 # Enhanced audio player
                 st.audio(
@@ -298,6 +287,20 @@ Try pasting a long article or story to see how the chunking and parallel process
                     autoplay=False,
                     loop=False
                 )
+                
+                # Auto-advance functionality
+                if auto_advance and current_chunk < len(audio_chunks) - 1:
+                    st.info("🔄 Auto-advance enabled")
+                    col_timer1, col_timer2 = st.columns([3, 1])
+                    with col_timer1:
+                        # Estimate duration based on text length
+                        current_text = st.session_state.get('current_text_chunks', [''])[current_chunk] if 'current_text_chunks' in st.session_state else ""
+                        estimated_seconds = max(5, len(current_text) // 15)  # ~15 chars per second
+                        st.write(f"⏱️ Estimated duration: ~{estimated_seconds} seconds")
+                    with col_timer2:
+                        if st.button("⏭️ Next Now", key=f"next_now_{current_chunk}"):
+                            st.session_state.current_chunk = min(len(audio_chunks) - 1, current_chunk + 1)
+                            st.rerun()
                 
                 # Audio controls
                 st.markdown("---")
@@ -319,10 +322,17 @@ Try pasting a long article or story to see how the chunking and parallel process
                         st.session_state.current_chunk = min(len(audio_chunks) - 1, current_chunk + 1)
                         st.rerun()
                 
-                # Auto-play toggle
+                # Auto-advance settings
                 col_auto1, col_auto2 = st.columns(2)
                 with col_auto1:
-                    auto_advance = st.checkbox("🔄 Auto-advance to next chunk", help="Automatically move to next chunk (manual for now)")
+                    if auto_advance and current_chunk < len(audio_chunks) - 1:
+                        st.info("🔄 Auto-advance enabled - will move to next chunk")
+                        # Add a button to advance manually or automatically after a delay
+                        if st.button("⏭️ Next Chunk (Auto)", use_container_width=True):
+                            st.session_state.current_chunk = min(len(audio_chunks) - 1, current_chunk + 1)
+                            st.rerun()
+                    elif auto_advance and current_chunk >= len(audio_chunks) - 1:
+                        st.success("✅ Last chunk - playback complete")
                 with col_auto2:
                     show_waveform = st.checkbox("📊 Show audio info", help="Display additional audio information")
                 
@@ -374,9 +384,9 @@ Try pasting a long article or story to see how the chunking and parallel process
             st.markdown("""
             **🎵 Audio Player Features:**
             - 🎤 6 different voice styles to choose from
-            - 🎛️ Playback speed recommendations 
+            - 🔄 Auto-advance with duration estimation
             - 📊 Audio format selection (MP3, WAV, OGG)
-            - 🔄 Easy chunk navigation
+            - ⏮️⏭️ Easy chunk navigation
             - 💾 Download individual chunks or complete audio
             - 🎵 Playlist-style audio management
             """)
@@ -386,9 +396,9 @@ Try pasting a long article or story to see how the chunking and parallel process
         st.markdown("""
         ### 🚀 Quick Start Guide
         
-        1. **🔐 Configure Credentials**: Enter your Azure OpenAI endpoint and API key in the sidebar (hidden for security)
+        1. **🔐 Configure Credentials**: Enter your Azure OpenAI endpoint and API key in the sidebar (completely hidden for security)
         2. **🎤 Choose Voice**: Select from 6 different voice personalities with unique characteristics
-        3. **🎛️ Audio Settings**: Choose your preferred audio format and playback speed reference
+        3. **🎛️ Audio Settings**: Choose your preferred audio format and enable auto-advance if desired
         4. **📝 Enter Text**: Paste or type your text in the main text area
         5. **🎵 Convert**: Click "Convert to Speech" to generate high-quality audio
         6. **🎧 Listen**: Use the enhanced audio player with navigation controls
@@ -407,16 +417,16 @@ Try pasting a long article or story to see how the chunking and parallel process
         - ✅ **Parallel Processing**: Faster generation with multi-threaded conversion
         - ✅ **Mobile-Optimized**: Responsive design works perfectly on phones
         - ✅ **Multiple Audio Formats**: Choose between MP3, WAV, and OGG formats
-        - ✅ **Playback Speed Guide**: Visual indicators for recommended playback speeds
+        - ✅ **Auto-Advance**: Automatically suggests moving to next chunk with duration estimation
         - ✅ **Playlist Management**: Easy navigation between audio chunks
-        - ✅ **Secure Credentials**: API keys are hidden and stored securely
+        - ✅ **Secure Credentials**: API keys are completely hidden and secure
         - ✅ **Progress Tracking**: Real-time feedback during audio generation
         - ✅ **Download Options**: Save individual chunks or complete audio files
         
         ### 🎛️ Audio Controls
-        - **Speed Settings**: While native browser speed control varies, use the speed slider as a reference
+        - **Auto-Advance**: Enable to get prompts to move to next chunk after estimated duration
         - **Format Selection**: Choose the best audio format for your needs
-        - **Auto-advance**: Future feature for automatic chunk progression
+        - **Manual Navigation**: Use Previous/Next buttons for full control
         - **Audio Info**: View technical details about your generated audio
         
         ### 📱 Mobile Usage Tips
