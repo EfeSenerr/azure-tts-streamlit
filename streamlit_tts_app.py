@@ -239,41 +239,48 @@ def main():
             "Enter your text to convert to speech:",
             value="""Welcome to the 🎵 Podcast Maker 🎧! This application uses Azure OpenAI's TTS API to convert your text into natural-sounding speech. 
 
-You can paste any text here, and the application will automatically split it into chunks if it's longer than 4000 characters. The chunks are processed in parallel for faster generation.
-
-Try pasting a long article or story to see how the chunking and parallel processing works!""",
+You can paste any text here, and the application will automatically split it into chunks if it's longer than 4000 characters. The chunks are processed in parallel for faster generation.""",
             height=200
         )
+
+        # Safety: Limit input to ~10 pages (about 30,000 characters)
+        MAX_INPUT_CHARS = 50000  # ~10 pages (assuming 3000 chars/page)
+        if len(text_input) > MAX_INPUT_CHARS:
+            st.warning(f"⚠️ Input too long! Please limit your text to about 10 pages (~{MAX_INPUT_CHARS} characters). You entered {len(text_input):,} characters.")
         
         # Convert button
         if st.button("🎵 Convert to Speech", type="primary", use_container_width=True):
             if not endpoint or not api_key:
                 st.error("Please provide both API endpoint and key in the sidebar")
                 return
-            
+
             if not text_input.strip():
                 st.error("Please enter some text to convert")
                 return
-            
+
+            if len(text_input) > MAX_INPUT_CHARS:
+                st.error(f"❌ Input too long! Please limit your text to about 10 pages (~{MAX_INPUT_CHARS} characters). You entered {len(text_input):,} characters.")
+                return
+
             try:
                 # Initialize TTS client
                 with st.spinner("Initializing TTS client..."):
                     tts_client = AzureTTSClient(endpoint, api_key)
-                
+
                 # Convert text to audio
                 with st.spinner("Converting text to speech..."):
                     audio_chunks = tts_client.convert_text_to_audio_data(text_input.strip(), selected_voice)
-                
+
                 if not audio_chunks:
                     st.error("Failed to generate audio")
                     return
-                
+
                 st.success(f"✅ Audio conversion completed! Generated {len(audio_chunks)} chunks.")
-                
+
                 # Store audio chunks in session state
                 st.session_state.audio_chunks = audio_chunks
                 st.session_state.current_chunk = 0
-                
+
             except Exception as e:
                 st.error(f"❌ TTS conversion failed: {str(e)}")
     
