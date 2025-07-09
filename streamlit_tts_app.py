@@ -145,37 +145,55 @@ def main():
     st.title("🎵 Azure Text-to-Speech App")
     st.markdown("Convert text to natural-sounding speech using Azure OpenAI's TTS API")
     
+    # Get API credentials from secrets/environment variables
+    try:
+        # First try Streamlit secrets
+        endpoint = st.secrets.get("AZURE_TTS_ENDPOINT", "")
+        api_key = st.secrets.get("AZURE_API_KEY", "")
+    except (FileNotFoundError, KeyError):
+        # Fallback to environment variables if secrets.toml not found
+        endpoint = os.getenv("AZURE_TTS_ENDPOINT", "")
+        api_key = os.getenv("AZURE_API_KEY", "")
+    
     # Sidebar for configuration
     with st.sidebar:
         st.header("⚙️ Configuration")
         
-        # API Configuration with smart fallback
-        # Try Streamlit secrets first, then environment variables, then empty
-        default_endpoint = ""
-        default_api_key = ""
+        # # API Configuration with smart fallback
+        # # Try Streamlit secrets first, then environment variables, then empty
+        # default_endpoint = ""
+        # default_api_key = ""
         
-        try:
-            # First try Streamlit secrets
-            default_endpoint = st.secrets.get("AZURE_TTS_ENDPOINT", "")
-            default_api_key = st.secrets.get("AZURE_API_KEY", "")
-        except (FileNotFoundError, KeyError):
-            # Fallback to environment variables if secrets.toml not found
-            default_endpoint = os.getenv("AZURE_TTS_ENDPOINT", "")
-            default_api_key = os.getenv("AZURE_API_KEY", "")
+        # try:
+        #     # First try Streamlit secrets
+        #     default_endpoint = st.secrets.get("AZURE_TTS_ENDPOINT", "")
+        #     default_api_key = st.secrets.get("AZURE_API_KEY", "")
+        # except (FileNotFoundError, KeyError):
+        #     # Fallback to environment variables if secrets.toml not found
+        #     default_endpoint = os.getenv("AZURE_TTS_ENDPOINT", "")
+        #     default_api_key = os.getenv("AZURE_API_KEY", "")
         
-        endpoint = st.text_input(
-            "API Endpoint",
-            value=default_endpoint,
-            type="default",
-            help="Your Azure OpenAI TTS endpoint URL"
-        )
+        # endpoint = st.text_input(
+        #     "API Endpoint",
+        #     value=default_endpoint,
+        #     type="default",
+        #     help="Your Azure OpenAI TTS endpoint URL"
+        # )
         
-        api_key = st.text_input(
-            "API Key",
-            value=default_api_key,
-            type="password",
-            help="Your Azure OpenAI API key (completely hidden for security)"
-        )
+        # api_key = st.text_input(
+        #     "API Key",
+        #     value=default_api_key,
+        #     type="password",
+        #     help="Your Azure OpenAI API key (completely hidden for security)"
+        # )
+
+        # Show connection status
+        if endpoint and api_key:
+            st.success("🔗 Azure TTS Connected")
+            st.caption("Using configured secrets")
+        else:
+            st.error("❌ Missing Azure TTS Configuration")
+            st.caption("Check your secrets.toml or .env file")
         
         st.markdown("### 🎵 Voice & Audio Settings")
         
