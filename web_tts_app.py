@@ -11,6 +11,10 @@ from flask import Flask, render_template, request, jsonify, send_file, Response
 import tempfile
 import uuid
 import base64
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 class AzureTTSClient:
     def __init__(self, endpoint: str, api_key: str):
@@ -122,8 +126,19 @@ class AzureTTSClient:
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'
 
-# Global TTS client
+# Initialize TTS client with environment variables
+azure_endpoint = os.getenv('AZURE_TTS_ENDPOINT')
+azure_api_key = os.getenv('AZURE_API_KEY')
+
 tts_client = None
+if azure_endpoint and azure_api_key:
+    try:
+        tts_client = AzureTTSClient(azure_endpoint, azure_api_key)
+        print("✅ TTS Client initialized from environment variables")
+    except Exception as e:
+        print(f"❌ Failed to initialize TTS client: {e}")
+else:
+    print("⚠️  Azure credentials not found in environment variables")
 
 @app.route('/')
 def index():
@@ -196,6 +211,12 @@ if __name__ == '__main__':
     print("Starting Azure TTS Web Application...")
     print("Access the application at: http://localhost:5000")
     print("Or from your phone using your computer's IP address: http://[YOUR-IP]:5000")
+    
+    # Print configuration info
+    if azure_endpoint:
+        print(f"Azure TTS Endpoint: {azure_endpoint}")
+    if azure_api_key:
+        print(f"Azure API Key: {'*' * (len(azure_api_key) - 8) + azure_api_key[-8:]}")
     
     # Run the Flask app
     app.run(host='0.0.0.0', port=5000, debug=True)
