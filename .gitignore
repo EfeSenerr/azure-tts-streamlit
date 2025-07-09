@@ -1,3 +1,9 @@
+# Environment variables
+.env
+
+# Streamlit secrets
+.streamlit/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

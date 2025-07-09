@@ -5,10 +5,11 @@ import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
 import io
-# from dotenv import load_dotenv
+import os
+from dotenv import load_dotenv
 
-# # Load environment variables from .env file
-# load_dotenv()
+# Load environment variables from .env file for fallback
+load_dotenv()
 
 class AzureTTSClient:
     def __init__(self, endpoint: str, api_key: str):
@@ -142,19 +143,32 @@ def main():
     with st.sidebar:
         st.header("⚙️ Configuration")
         
-        # API Configuration
+        # API Configuration with smart fallback
+        # Try Streamlit secrets first, then environment variables, then empty
+        default_endpoint = ""
+        default_api_key = ""
+        
+        try:
+            # First try Streamlit secrets
+            default_endpoint = st.secrets.get("AZURE_TTS_ENDPOINT", "")
+            default_api_key = st.secrets.get("AZURE_API_KEY", "")
+        except (FileNotFoundError, KeyError):
+            # Fallback to environment variables if secrets.toml not found
+            default_endpoint = os.getenv("AZURE_TTS_ENDPOINT", "")
+            default_api_key = os.getenv("AZURE_API_KEY", "")
+        
         endpoint = st.text_input(
             "API Endpoint",
-            value="",  # Don't pre-fill from secrets for security
+            value=default_endpoint,
             type="default",
             help="Your Azure OpenAI TTS endpoint URL"
         )
         
         api_key = st.text_input(
             "API Key",
-            value="",  # Don't pre-fill from secrets for security
+            value=default_api_key,
             type="password",
-            help="Enter your Azure OpenAI API key (completely hidden for security)"
+            help="Your Azure OpenAI API key (completely hidden for security)"
         )
         
         st.markdown("### 🎵 Voice & Audio Settings")
