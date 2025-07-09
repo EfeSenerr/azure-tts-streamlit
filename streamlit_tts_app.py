@@ -21,8 +21,14 @@ class AzureTTSClient:
             "Authorization": f"Bearer {api_key}"
         }
         
-    def chunk_text(self, text: str, max_chars: int = 4000) -> List[str]:
-        """Split text into chunks that respect sentence boundaries"""
+    def chunk_text(self, text: str, max_chars: int = 6000) -> List[str]:
+        """Split text into chunks that respect sentence boundaries
+        
+        GPT-4o mini TTS has a limit of 2000 tokens per request.
+        Using ~6000 characters provides a safe margin since tokens are 
+        roughly 3-4 characters each (2000 tokens ≈ 6000-8000 chars).
+        We use 6000 characters to stay safely within the token limit.
+        """
         if len(text) <= max_chars:
             return [text]
         
@@ -454,7 +460,7 @@ Try pasting a long article or story to see how the chunking and parallel process
     with st.expander("🚀 Performance & Tips", expanded=False):
         st.markdown("""
         ### ⚡ Performance Optimization
-        - **Chunk Size**: Texts are automatically split into ~4000 character chunks for optimal processing
+        - **Chunk Size**: Texts are automatically split into ~6000 character chunks (GPT-4o mini TTS limit: 2000 tokens ≈ 6000-8000 chars)
         - **Parallel Processing**: Multiple chunks are generated simultaneously for faster results
         - **Memory Efficient**: Audio data is streamed efficiently without excessive memory usage
         
