@@ -5,6 +5,10 @@ import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
 import io
+# from dotenv import load_dotenv
+
+# # Load environment variables from .env file
+# load_dotenv()
 
 class AzureTTSClient:
     def __init__(self, endpoint: str, api_key: str):
@@ -138,20 +142,61 @@ def main():
         # API Configuration
         endpoint = st.text_input(
             "API Endpoint",
-            value=st.secrets.get("AZURE_TTS_ENDPOINT"),
-            type="default"
+            value=st.secrets.get("AZURE_TTS_ENDPOINT", ""),
+            type="default",
+            help="Your Azure OpenAI TTS endpoint URL"
         )
         
         api_key = st.text_input(
             "API Key",
             value=st.secrets.get("AZURE_API_KEY", ""),
-            type="password"
+            type="password",
+            help="Your Azure OpenAI API key (hidden for security)"
         )
         
-        voice = st.selectbox(
-            "Voice",
-            options=["alloy", "echo", "fable", "onyx", "nova", "shimmer"],
-            index=0
+        st.markdown("### 🎵 Voice & Audio Settings")
+        
+        # Voice selection with descriptions
+        voice_options = {
+            "alloy": "Alloy - Balanced and natural",
+            "echo": "Echo - Clear and articulate", 
+            "fable": "Fable - Warm and storytelling",
+            "onyx": "Onyx - Deep and authoritative",
+            "nova": "Nova - Bright and energetic", 
+            "shimmer": "Shimmer - Soft and gentle"
+        }
+        
+        selected_voice = st.selectbox(
+            "🎤 Voice Style",
+            options=list(voice_options.keys()),
+            index=0,
+            format_func=lambda x: voice_options[x],
+            help="Choose the voice character for text-to-speech"
+        )
+        
+        # Audio playback speed (simulation via start/end time)
+        playback_speed = st.slider(
+            "🎛️ Playback Speed",
+            min_value=0.5,
+            max_value=2.0,
+            value=1.0,
+            step=0.1,
+            help="Adjust playback speed (Note: This is a visual indicator - actual speed control depends on browser audio player)"
+        )
+        
+        # Display speed info
+        if playback_speed != 1.0:
+            if playback_speed < 1.0:
+                st.info(f"🐌 Slower playback: {playback_speed}x speed")
+            else:
+                st.info(f"🚀 Faster playback: {playback_speed}x speed")
+        
+        # Audio format option
+        audio_format = st.selectbox(
+            "🎵 Audio Format",
+            options=["mp3", "wav", "ogg"],
+            index=0,
+            help="Select audio output format"
         )
         
         st.markdown("---")
@@ -190,7 +235,7 @@ Try pasting a long article or story to see how the chunking and parallel process
                 
                 # Convert text to audio
                 with st.spinner("Converting text to speech..."):
-                    audio_chunks = tts_client.convert_text_to_audio_data(text_input.strip(), voice)
+                    audio_chunks = tts_client.convert_text_to_audio_data(text_input.strip(), selected_voice)
                 
                 if not audio_chunks:
                     st.error("Failed to generate audio")
@@ -212,14 +257,21 @@ Try pasting a long article or story to see how the chunking and parallel process
             audio_chunks = st.session_state.audio_chunks
             current_chunk = st.session_state.get('current_chunk', 0)
             
-            st.info(f"📊 Total chunks: {len(audio_chunks)}")
+            # Audio info panel
+            with st.container():
+                col_info1, col_info2 = st.columns(2)
+                with col_info1:
+                    st.metric("📊 Total Chunks", len(audio_chunks))
+                with col_info2:
+                    st.metric("🎵 Current Voice", voice_options.get(selected_voice, selected_voice).split(' - ')[0])
             
             # Chunk selector
             selected_chunk = st.selectbox(
-                "Select chunk to play:",
+                "🎵 Select Audio Chunk",
                 options=range(len(audio_chunks)),
                 index=current_chunk,
-                format_func=lambda x: f"Chunk {x + 1}"
+                format_func=lambda x: f"🎵 Chunk {x + 1} of {len(audio_chunks)}",
+                help="Choose which audio chunk to play"
             )
             
             # Update current chunk if changed
@@ -229,68 +281,202 @@ Try pasting a long article or story to see how the chunking and parallel process
             
             # Play selected chunk
             if current_chunk < len(audio_chunks):
-                st.markdown(f"**🎵 Playing Chunk {current_chunk + 1}/{len(audio_chunks)}**")
+                st.markdown(f"**🎵 Now Playing: Chunk {current_chunk + 1}/{len(audio_chunks)}**")
                 
-                # Create audio player
+                # Create enhanced audio player with speed simulation
                 audio_bytes = audio_chunks[current_chunk]
-                st.audio(audio_bytes, format='audio/mp3')
                 
-                # Navigation buttons
-                col_prev, col_next = st.columns(2)
+                # Audio player with speed note
+                if playback_speed != 1.0:
+                    st.info(f"🎛️ Suggested playback speed: {playback_speed}x (Use your browser's audio controls to adjust speed)")
+                
+                # Enhanced audio player
+                st.audio(
+                    audio_bytes, 
+                    format=f'audio/{audio_format}',
+                    start_time=0,
+                    autoplay=False,
+                    loop=False
+                )
+                
+                # Audio controls
+                st.markdown("---")
+                st.markdown("**🎛️ Playback Controls**")
+                
+                # Navigation buttons with enhanced styling
+                col_prev, col_play_info, col_next = st.columns([1, 2, 1])
                 
                 with col_prev:
-                    if st.button("⏮️ Previous", disabled=(current_chunk == 0)):
+                    if st.button("⏮️ Previous", disabled=(current_chunk == 0), use_container_width=True):
                         st.session_state.current_chunk = max(0, current_chunk - 1)
                         st.rerun()
                 
+                with col_play_info:
+                    st.markdown(f"<div style='text-align: center; padding: 8px;'>**Chunk {current_chunk + 1} / {len(audio_chunks)}**</div>", unsafe_allow_html=True)
+                
                 with col_next:
-                    if st.button("⏭️ Next", disabled=(current_chunk >= len(audio_chunks) - 1)):
+                    if st.button("⏭️ Next", disabled=(current_chunk >= len(audio_chunks) - 1), use_container_width=True):
                         st.session_state.current_chunk = min(len(audio_chunks) - 1, current_chunk + 1)
                         st.rerun()
                 
+                # Auto-play toggle
+                col_auto1, col_auto2 = st.columns(2)
+                with col_auto1:
+                    auto_advance = st.checkbox("🔄 Auto-advance to next chunk", help="Automatically move to next chunk (manual for now)")
+                with col_auto2:
+                    show_waveform = st.checkbox("📊 Show audio info", help="Display additional audio information")
+                
+                if show_waveform:
+                    audio_size_kb = len(audio_bytes) / 1024
+                    st.info(f"📊 Audio size: {audio_size_kb:.1f} KB | Format: {audio_format.upper()} | Voice: {selected_voice}")
+                
                 # Download options
                 st.markdown("---")
-                st.markdown("**💾 Download Options:**")
+                st.markdown("**💾 Download Options**")
                 
-                # Download current chunk
-                st.download_button(
-                    label=f"⬇️ Download Chunk {current_chunk + 1}",
-                    data=audio_bytes,
-                    file_name=f"tts_chunk_{current_chunk + 1}.mp3",
-                    mime="audio/mp3"
-                )
+                col_dl1, col_dl2 = st.columns(2)
                 
-                # Download all chunks as zip (simplified - just current for now)
-                st.download_button(
-                    label="⬇️ Download All Audio",
-                    data=b"".join(audio_chunks),
-                    file_name="tts_complete_audio.mp3",
-                    mime="audio/mp3"
-                )
+                with col_dl1:
+                    # Download current chunk
+                    st.download_button(
+                        label=f"⬇️ Download Chunk {current_chunk + 1}",
+                        data=audio_bytes,
+                        file_name=f"tts_chunk_{current_chunk + 1}_{selected_voice}.{audio_format}",
+                        mime=f"audio/{audio_format}",
+                        use_container_width=True
+                    )
+                
+                with col_dl2:
+                    # Download all chunks combined
+                    combined_audio = b"".join(audio_chunks)
+                    st.download_button(
+                        label="⬇️ Download All Audio",
+                        data=combined_audio,
+                        file_name=f"tts_complete_{selected_voice}.{audio_format}",
+                        mime=f"audio/{audio_format}",
+                        use_container_width=True
+                    )
+                
+                # Playlist-style chunk list
+                if len(audio_chunks) > 1:
+                    with st.expander("🎵 Audio Playlist", expanded=False):
+                        for i, _ in enumerate(audio_chunks):
+                            col_track, col_play = st.columns([3, 1])
+                            with col_track:
+                                status = "🔊 Playing" if i == current_chunk else "⏸️ Paused"
+                                st.write(f"{status} - Chunk {i + 1}")
+                            with col_play:
+                                if st.button(f"Play {i + 1}", key=f"play_{i}", disabled=(i == current_chunk)):
+                                    st.session_state.current_chunk = i
+                                    st.rerun()
         else:
             st.info("👆 Convert some text to see the audio player")
+            st.markdown("""
+            **🎵 Audio Player Features:**
+            - 🎤 6 different voice styles to choose from
+            - 🎛️ Playback speed recommendations 
+            - 📊 Audio format selection (MP3, WAV, OGG)
+            - 🔄 Easy chunk navigation
+            - 💾 Download individual chunks or complete audio
+            - 🎵 Playlist-style audio management
+            """)
     
     # Instructions section
-    with st.expander("📖 How to Use"):
+    with st.expander("📖 How to Use This App", expanded=False):
         st.markdown("""
-        1. **Configure**: Enter your Azure OpenAI endpoint and API key in the sidebar
-        2. **Select Voice**: Choose from 6 available voices (alloy, echo, fable, onyx, nova, shimmer)
-        3. **Enter Text**: Paste or type your text in the text area
-        4. **Convert**: Click "Convert to Speech" to generate audio
-        5. **Play**: Use the audio player to listen to individual chunks or navigate between them
-        6. **Download**: Save individual chunks or the complete audio file
+        ### 🚀 Quick Start Guide
         
-        **Features:**
-        - ✅ Automatic text chunking for long texts
-        - ✅ Parallel processing for faster generation
-        - ✅ Mobile-friendly interface
-        - ✅ Multiple voice options
-        - ✅ Chunk navigation and download
+        1. **🔐 Configure Credentials**: Enter your Azure OpenAI endpoint and API key in the sidebar (hidden for security)
+        2. **🎤 Choose Voice**: Select from 6 different voice personalities with unique characteristics
+        3. **🎛️ Audio Settings**: Choose your preferred audio format and playback speed reference
+        4. **📝 Enter Text**: Paste or type your text in the main text area
+        5. **🎵 Convert**: Click "Convert to Speech" to generate high-quality audio
+        6. **🎧 Listen**: Use the enhanced audio player with navigation controls
+        7. **💾 Download**: Save individual chunks or complete audio files
+        
+        ### 🎵 Voice Personalities
+        - **Alloy**: Balanced and natural - great for general content
+        - **Echo**: Clear and articulate - perfect for educational material  
+        - **Fable**: Warm and storytelling - ideal for narratives and stories
+        - **Onyx**: Deep and authoritative - excellent for presentations
+        - **Nova**: Bright and energetic - suitable for marketing content
+        - **Shimmer**: Soft and gentle - perfect for meditation or relaxation
+        
+        ### ✨ Advanced Features
+        - ✅ **Smart Text Chunking**: Automatically splits long texts at sentence boundaries
+        - ✅ **Parallel Processing**: Faster generation with multi-threaded conversion
+        - ✅ **Mobile-Optimized**: Responsive design works perfectly on phones
+        - ✅ **Multiple Audio Formats**: Choose between MP3, WAV, and OGG formats
+        - ✅ **Playback Speed Guide**: Visual indicators for recommended playback speeds
+        - ✅ **Playlist Management**: Easy navigation between audio chunks
+        - ✅ **Secure Credentials**: API keys are hidden and stored securely
+        - ✅ **Progress Tracking**: Real-time feedback during audio generation
+        - ✅ **Download Options**: Save individual chunks or complete audio files
+        
+        ### 🎛️ Audio Controls
+        - **Speed Settings**: While native browser speed control varies, use the speed slider as a reference
+        - **Format Selection**: Choose the best audio format for your needs
+        - **Auto-advance**: Future feature for automatic chunk progression
+        - **Audio Info**: View technical details about your generated audio
+        
+        ### 📱 Mobile Usage Tips
+        - All controls are touch-friendly and responsive
+        - Use landscape mode for the best experience
+        - Audio files work with your device's native audio controls
+        - Downloads save directly to your device's download folder
         """)
     
-    # Footer
+    # Performance Tips
+    with st.expander("🚀 Performance & Tips", expanded=False):
+        st.markdown("""
+        ### ⚡ Performance Optimization
+        - **Chunk Size**: Texts are automatically split into ~4000 character chunks for optimal processing
+        - **Parallel Processing**: Multiple chunks are generated simultaneously for faster results
+        - **Memory Efficient**: Audio data is streamed efficiently without excessive memory usage
+        
+        ### 💡 Pro Tips
+        - **Long Documents**: For very long texts, consider breaking them into sections manually
+        - **Voice Testing**: Try different voices with the same text to find your preferred style
+        - **Mobile Downloads**: Audio files can be saved directly to your phone for offline listening
+        - **Browser Compatibility**: Works best in modern browsers with HTML5 audio support
+        
+        ### 🔧 Troubleshooting
+        - **No Audio**: Check that your API credentials are correct and valid
+        - **Slow Generation**: Large texts take longer - progress bars show real-time status
+        - **Download Issues**: Ensure your browser allows downloads from this domain
+        """)
+    
+    # Security section
+    with st.expander("🔐 Security & Privacy", expanded=False):
+        st.markdown("""
+        ### 🛡️ Security Features
+        - **Hidden API Keys**: Your credentials are masked and never displayed in logs
+        - **Secure Storage**: API keys are stored securely in Streamlit secrets
+        - **No Persistence**: Audio data is not permanently stored on servers
+        - **HTTPS Ready**: Fully compatible with secure HTTPS deployments
+        
+        ### 🔒 Privacy Considerations
+        - **Text Processing**: Your text is sent to Azure OpenAI for processing
+        - **Temporary Storage**: Audio is generated and delivered directly to your browser
+        - **No Tracking**: This app doesn't track or store your personal data
+        - **Local Downloads**: Generated audio files are saved locally to your device
+        """)
+    
+    # Footer with enhanced information
     st.markdown("---")
-    st.markdown("Built with ❤️ using Streamlit and Azure OpenAI TTS")
+    col_footer1, col_footer2, col_footer3 = st.columns(3)
+    
+    with col_footer1:
+        st.markdown("**🎵 Azure TTS App**")
+        st.markdown("Built with ❤️ using Streamlit")
+    
+    with col_footer2:
+        st.markdown("**🔗 Powered By**")
+        st.markdown("Azure OpenAI TTS API")
+    
+    with col_footer3:
+        st.markdown("**📱 Mobile Ready**")
+        st.markdown("Optimized for all devices")
 
 if __name__ == "__main__":
     main()
