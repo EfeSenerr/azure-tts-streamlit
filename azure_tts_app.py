@@ -191,13 +191,13 @@ class TTSInterface:
         
         # API Endpoint
         ttk.Label(config_frame, text="API Endpoint:").grid(row=0, column=0, sticky="w", pady=2)
-        self.endpoint_var = tk.StringVar(value="https://sener-mcryr3zf-eastus2.openai.azure.com/openai/deployments/gpt-4o-mini-tts/audio/speech?api-version=2025-03-01-preview")
+        self.endpoint_var = tk.StringVar(value="https://YOUR-RESOURCE.openai.azure.com/openai/deployments/YOUR-DEPLOYMENT/audio/speech?api-version=2025-03-01-preview")
         endpoint_entry = ttk.Entry(config_frame, textvariable=self.endpoint_var, width=80)
         endpoint_entry.grid(row=0, column=1, pady=2, padx=5)
         
         # API Key
         ttk.Label(config_frame, text="API Key:").grid(row=1, column=0, sticky="w", pady=2)
-        self.api_key_var = tk.StringVar(value="FLF9WIzEk4XuP61sqWHbG9a8P8wzsOSkgPdXKpDeBqyTMLaEXL2QJQQJ99BGACHYHv6XJ3w3AAAAACOGSuop")
+        self.api_key_var = tk.StringVar(value="YOUR_API_KEY_HERE")
         api_key_entry = ttk.Entry(config_frame, textvariable=self.api_key_var, width=80, show="*")
         api_key_entry.grid(row=1, column=1, pady=2, padx=5)
         
@@ -315,8 +315,8 @@ Try pasting a long article or story to see how the chunking and parallel process
 # Quick test function for command-line usage
 def quick_test():
     """Quick test function for command-line usage"""
-    endpoint = "https://sener-mcryr3zf-eastus2.openai.azure.com/openai/deployments/gpt-4o-mini-tts/audio/speech?api-version=2025-03-01-preview"
-    api_key = "FLF9WIzEk4XuP61sqWHbG9a8P8wzsOSkgPdXKpDeBqyTMLaEXL2QJQQJ99BGACHYHv6XJ3w3AAAAACOGSuop"
+    endpoint = "https://YOUR-RESOURCE.openai.azure.com/openai/deployments/YOUR-DEPLOYMENT/audio/speech?api-version=2025-03-01-preview"
+    api_key = "YOUR_API_KEY_HERE"
     
     # Create TTS client
     tts = AzureTTSClient(endpoint, api_key)
