@@ -136,13 +136,13 @@ class AzureTTSClient:
 
 def main():
     st.set_page_config(
-        page_title="🎵 Azure TTS App",
+        page_title="🎵 Podcast Maker 🎧",
         page_icon="🎵",
         layout="wide",
         initial_sidebar_state="expanded"
     )
     
-    st.title("🎵 Azure Text-to-Speech App")
+    st.title("🎵 Podcast Maker 🎧")
     st.markdown("Convert text to natural-sounding speech using Azure OpenAI's TTS API")
     
     # Get API credentials from secrets/environment variables
@@ -230,10 +230,6 @@ def main():
             help="Automatically move to next chunk after audio ends"
         )
         
-        st.markdown("---")
-        st.markdown("### 📱 Mobile Friendly")
-        st.markdown("This app works great on phones!")
-        
     # Main content area
     col1, col2 = st.columns([2, 1])
     
@@ -241,7 +237,7 @@ def main():
         st.header("📝 Text Input")
         text_input = st.text_area(
             "Enter your text to convert to speech:",
-            value="""Welcome to the Azure Text-to-Speech Streamlit demo! This application uses Azure OpenAI's TTS API to convert your text into natural-sounding speech. 
+            value="""Welcome to the 🎵 Podcast Maker 🎧! This application uses Azure OpenAI's TTS API to convert your text into natural-sounding speech. 
 
 You can paste any text here, and the application will automatically split it into chunks if it's longer than 4000 characters. The chunks are processed in parallel for faster generation.
 
@@ -515,7 +511,7 @@ Try pasting a long article or story to see how the chunking and parallel process
     col_footer1, col_footer2, col_footer3 = st.columns(3)
     
     with col_footer1:
-        st.markdown("**🎵 Azure TTS App**")
+        st.markdown("**🎵 Podcast Maker 🎧**")
         st.markdown("Built with ❤️ using Streamlit")
     
     with col_footer2:
