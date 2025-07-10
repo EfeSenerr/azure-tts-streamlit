@@ -14,9 +14,9 @@ A Python application that converts text to speech using Azure OpenAI's TTS API w
 
 ## Setup
 
-1. **Activate your conda environment**:
+1. **Activate your environment**:
    ```powershell
-   conda activate agentic
+   conda activate xx
    ```
 
 2. **Install dependencies**:
@@ -70,7 +70,7 @@ Then choose option "2" for the quick test.
 ```
 azure-tts-app/
 ├── azure_tts_app.py    # Main application
-├── config.py           # Configuration settings
+├── .env           # Configuration settings
 ├── requirements.txt    # Python dependencies
 └── README.md          # This file
 ```
