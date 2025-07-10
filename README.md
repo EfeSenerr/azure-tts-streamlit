@@ -1,4 +1,4 @@
-# Azure TTS Application
+# 🎵 Podcast Maker 🎧
 
 A Python application that converts text to speech using Azure OpenAI's TTS API with parallel processing for long texts.
 
