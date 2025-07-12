@@ -8,7 +8,7 @@ import io
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env file for fallback
+# Load environment variables from .env file for  
 load_dotenv()
 
 class AzureTTSClient:
@@ -93,13 +93,12 @@ class AzureTTSClient:
         except requests.exceptions.RequestException as e:
             raise Exception(f"TTS API request failed: {str(e)}")
     
-    def convert_text_to_audio_data(self, text: str, voice: str = "alloy", max_workers: int = 3) -> List[bytes]:
-        """Convert text to speech and return list of audio data as bytes"""
+    def convert_text_to_audio_data(self, text: str, voice: str = "alloy", max_workers: int = 3) -> bytes:
+        """Convert text to speech and return combined audio data as bytes"""
         chunks = self.chunk_text(text)
-        st.info(f"Text split into {len(chunks)} chunks")
         
-        # Store text chunks in session state for duration estimation
-        st.session_state.current_text_chunks = chunks
+        if len(chunks) > 1:
+            st.info(f"Processing text in {len(chunks)} parts for optimal quality...")
         
         # Create progress bar
         progress_bar = st.progress(0)
@@ -123,27 +122,52 @@ class AzureTTSClient:
                     results[index] = audio_data
                     completed_chunks += 1
                     progress_bar.progress(completed_chunks / len(chunks))
-                    st.write(f"✅ Chunk {index + 1}/{len(chunks)} processed")
+                    st.write(f"✅ Part {index + 1}/{len(chunks)} completed")
                 except Exception as e:
-                    st.error(f"❌ Error processing chunk {index + 1}: {e}")
+                    st.error(f"❌ Error processing part {index + 1}: {e}")
                     results[index] = None
         
         progress_bar.empty()
         
         # Filter out None results
         audio_chunks = [audio for audio in results if audio is not None]
-        return audio_chunks
+        
+        if not audio_chunks:
+            raise Exception("No audio chunks were successfully generated")
+        
+        # Combine all chunks into a single audio file
+        if len(audio_chunks) > 1:
+            st.info("Combining audio parts into seamless speech...")
+            combined_audio = self.combine_audio_chunks(audio_chunks)
+        else:
+            combined_audio = audio_chunks[0]
+        
+        return combined_audio
+    
+    def combine_audio_chunks(self, audio_chunks: List[bytes]) -> bytes:
+        """Combine multiple audio chunks into a single seamless audio file"""
+        if not audio_chunks:
+            return b""
+        
+        if len(audio_chunks) == 1:
+            return audio_chunks[0]
+        
+        # For MP3 files, we can simply concatenate the bytes
+        # This works because MP3 is designed to be streamable
+        combined_audio = b"".join(audio_chunks)
+        return combined_audio
 
 def main():
     st.set_page_config(
-        page_title="🎵 Podcast Maker 🎧",
+        page_title="Podcast Maker 🎧",
         page_icon="🎵",
         layout="wide",
         initial_sidebar_state="expanded"
     )
     
     st.title("🎵 Podcast Maker 🎧")
-    st.markdown("Convert text to natural-sounding speech using Azure OpenAI's TTS API")
+    st.markdown("""Welcome to the Podcast Maker! This application uses Azure OpenAI's TTS API to convert your text into natural-sounding speech. 
+                You can paste any text here, and the application will automatically process it to create seamless, high-quality audio. Long texts are handled intelligently behind the scenes for optimal results.""")
     
     # Get API credentials from secrets/environment variables
     try:
@@ -217,17 +241,17 @@ def main():
         
         # Audio format option
         audio_format = st.selectbox(
-            "� Audio Format",
+            "🎵 Audio Format",
             options=["mp3", "wav", "ogg"],
             index=0,
             help="Select audio output format"
         )
         
-        # Auto-advance setting
-        auto_advance = st.checkbox(
-            "� Auto-advance chunks",
+        # Auto-play setting
+        auto_play = st.checkbox(
+            "🔊 Auto-play audio",
             value=True,
-            help="Automatically move to next chunk after audio ends"
+            help="Automatically start playing audio after conversion"
         )
         
     # Main content area
@@ -237,9 +261,7 @@ def main():
         st.header("📝 Text Input")
         text_input = st.text_area(
             "Enter your text to convert to speech:",
-            value="""Welcome to the 🎵 Podcast Maker 🎧! This application uses Azure OpenAI's TTS API to convert your text into natural-sounding speech. 
-
-You can paste any text here, and the application will automatically split it into chunks if it's longer than 4000 characters. The chunks are processed in parallel for faster generation.""",
+            value="""You can paste any text here.""",
             height=200
         )
 
@@ -269,167 +291,98 @@ You can paste any text here, and the application will automatically split it int
 
                 # Convert text to audio
                 with st.spinner("Converting text to speech..."):
-                    audio_chunks = tts_client.convert_text_to_audio_data(text_input.strip(), selected_voice)
+                    combined_audio = tts_client.convert_text_to_audio_data(text_input.strip(), selected_voice)
 
-                if not audio_chunks:
+                if not combined_audio:
                     st.error("Failed to generate audio")
                     return
 
-                st.success(f"✅ Audio conversion completed! Generated {len(audio_chunks)} chunks.")
+                st.success("✅ Audio conversion completed!")
 
-                # Store audio chunks in session state
-                st.session_state.audio_chunks = audio_chunks
-                st.session_state.current_chunk = 0
+                # Store combined audio in session state
+                st.session_state.combined_audio = combined_audio
 
             except Exception as e:
                 st.error(f"❌ TTS conversion failed: {str(e)}")
     
     with col2:
-        st.header("🎵 Audio Player")
+        st.header("Audio Player")
         
-        if 'audio_chunks' in st.session_state and st.session_state.audio_chunks:
-            audio_chunks = st.session_state.audio_chunks
-            current_chunk = st.session_state.get('current_chunk', 0)
+        if 'combined_audio' in st.session_state and st.session_state.combined_audio:
+            combined_audio = st.session_state.combined_audio
             
             # Audio info panel
             with st.container():
                 col_info1, col_info2 = st.columns(2)
                 with col_info1:
-                    st.metric("📊 Total Chunks", len(audio_chunks))
+                    audio_size_mb = len(combined_audio) / (1024 * 1024)
+                    st.metric("📊 Audio Size", f"{audio_size_mb:.2f} MB")
                 with col_info2:
-                    st.metric("🎵 Current Voice", voice_options.get(selected_voice, selected_voice).split(' - ')[0])
+                    st.metric("🎵 Voice", voice_options.get(selected_voice, selected_voice).split(' - ')[0])
             
-            # Chunk selector
-            selected_chunk = st.selectbox(
-                "🎵 Select Audio Chunk",
-                options=range(len(audio_chunks)),
-                index=current_chunk,
-                format_func=lambda x: f"🎵 Chunk {x + 1} of {len(audio_chunks)}",
-                help="Choose which audio chunk to play"
+            st.markdown("**🎵 Your Audio is Ready!**")
+            
+            # Main audio player
+            st.audio(
+                combined_audio, 
+                format=f'audio/{audio_format}',
+                start_time=0,
+                autoplay=auto_play,
+                loop=False
             )
             
-            # Update current chunk if changed
-            if selected_chunk != current_chunk:
-                st.session_state.current_chunk = selected_chunk
-                current_chunk = selected_chunk
+            # Additional audio information
+            show_audio_info = st.checkbox("📊 Show detailed audio info", help="Display technical audio information")
             
-            # Play selected chunk
-            if current_chunk < len(audio_chunks):
-                st.markdown(f"**🎵 Now Playing: Chunk {current_chunk + 1}/{len(audio_chunks)}**")
-                
-                # Create enhanced audio player
-                audio_bytes = audio_chunks[current_chunk]
-                
-                # Enhanced audio player
-                st.audio(
-                    audio_bytes, 
-                    format=f'audio/{audio_format}',
-                    start_time=0,
-                    autoplay=False,
-                    loop=False
+            if show_audio_info:
+                st.info(f"📊 Format: {audio_format.upper()} | Voice: {selected_voice} | Size: {audio_size_kb:.1f} KB")
+            
+            # Download section
+            st.markdown("---")
+            st.markdown("**💾 Download Audio**")
+            
+            col_download1, col_download2 = st.columns(2)
+            
+            with col_download1:
+                st.download_button(
+                    label="⬇️ Download Audio",
+                    data=combined_audio,
+                    file_name=f"podcast_{selected_voice}.{audio_format}",
+                    mime=f"audio/{audio_format}",
+                    use_container_width=True,
+                    help="Download the complete audio file"
                 )
+            
+            with col_download2:
+                # Create a base64 encoded version for sharing
+                audio_b64 = base64.b64encode(combined_audio).decode()
+                audio_size_mb = len(combined_audio) / (1024 * 1024)
+                st.write(f"📋 File size: {audio_size_mb:.2f} MB")
+            
+            # Playback tips
+            with st.expander("� Playback Tips", expanded=False):
+                st.markdown("""
+                **🎵 Audio Playback:**
+                - Use your browser's built-in controls for play/pause/seek
+                - Right-click the audio player for additional options
+                - The audio will play continuously without interruption
+                - Compatible with all modern browsers and mobile devices
                 
-                # Auto-advance functionality
-                if auto_advance and current_chunk < len(audio_chunks) - 1:
-                    st.info("🔄 Auto-advance enabled")
-                    col_timer1, col_timer2 = st.columns([3, 1])
-                    with col_timer1:
-                        # Estimate duration based on text length
-                        current_text = st.session_state.get('current_text_chunks', [''])[current_chunk] if 'current_text_chunks' in st.session_state else ""
-                        estimated_seconds = max(5, len(current_text) // 15)  # ~15 chars per second
-                        st.write(f"⏱️ Estimated duration: ~{estimated_seconds} seconds")
-                    with col_timer2:
-                        if st.button("⏭️ Next Now", key=f"next_now_{current_chunk}"):
-                            st.session_state.current_chunk = min(len(audio_chunks) - 1, current_chunk + 1)
-                            st.rerun()
-                
-                # Audio controls
-                st.markdown("---")
-                st.markdown("**🎛️ Playback Controls**")
-                
-                # Navigation buttons with enhanced styling
-                col_prev, col_play_info, col_next = st.columns([1, 2, 1])
-                
-                with col_prev:
-                    if st.button("⏮️ Previous", disabled=(current_chunk == 0), use_container_width=True):
-                        st.session_state.current_chunk = max(0, current_chunk - 1)
-                        st.rerun()
-                
-                with col_play_info:
-                    st.markdown(f"<div style='text-align: center; padding: 8px;'>**Chunk {current_chunk + 1} / {len(audio_chunks)}**</div>", unsafe_allow_html=True)
-                
-                with col_next:
-                    if st.button("⏭️ Next", disabled=(current_chunk >= len(audio_chunks) - 1), use_container_width=True):
-                        st.session_state.current_chunk = min(len(audio_chunks) - 1, current_chunk + 1)
-                        st.rerun()
-                
-                # Auto-advance settings
-                col_auto1, col_auto2 = st.columns(2)
-                with col_auto1:
-                    if auto_advance and current_chunk < len(audio_chunks) - 1:
-                        st.info("🔄 Auto-advance enabled - will move to next chunk")
-                        # Add a button to advance manually or automatically after a delay
-                        if st.button("⏭️ Next Chunk (Auto)", use_container_width=True):
-                            st.session_state.current_chunk = min(len(audio_chunks) - 1, current_chunk + 1)
-                            st.rerun()
-                    elif auto_advance and current_chunk >= len(audio_chunks) - 1:
-                        st.success("✅ Last chunk - playback complete")
-                with col_auto2:
-                    show_waveform = st.checkbox("📊 Show audio info", help="Display additional audio information")
-                
-                if show_waveform:
-                    audio_size_kb = len(audio_bytes) / 1024
-                    st.info(f"📊 Audio size: {audio_size_kb:.1f} KB | Format: {audio_format.upper()} | Voice: {selected_voice}")
-                
-                # Download options
-                st.markdown("---")
-                st.markdown("**💾 Download Options**")
-                
-                col_dl1, col_dl2 = st.columns(2)
-                
-                with col_dl1:
-                    # Download current chunk
-                    st.download_button(
-                        label=f"⬇️ Download Chunk {current_chunk + 1}",
-                        data=audio_bytes,
-                        file_name=f"tts_chunk_{current_chunk + 1}_{selected_voice}.{audio_format}",
-                        mime=f"audio/{audio_format}",
-                        use_container_width=True
-                    )
-                
-                with col_dl2:
-                    # Download all chunks combined
-                    combined_audio = b"".join(audio_chunks)
-                    st.download_button(
-                        label="⬇️ Download All Audio",
-                        data=combined_audio,
-                        file_name=f"tts_complete_{selected_voice}.{audio_format}",
-                        mime=f"audio/{audio_format}",
-                        use_container_width=True
-                    )
-                
-                # Playlist-style chunk list
-                if len(audio_chunks) > 1:
-                    with st.expander("🎵 Audio Playlist", expanded=False):
-                        for i, _ in enumerate(audio_chunks):
-                            col_track, col_play = st.columns([3, 1])
-                            with col_track:
-                                status = "🔊 Playing" if i == current_chunk else "⏸️ Paused"
-                                st.write(f"{status} - Chunk {i + 1}")
-                            with col_play:
-                                if st.button(f"Play {i + 1}", key=f"play_{i}", disabled=(i == current_chunk)):
-                                    st.session_state.current_chunk = i
-                                    st.rerun()
+                **💾 Download Options:**
+                - Click "Download Audio" to save the file locally
+                - The downloaded file works with any audio player
+                - Perfect for offline listening or sharing
+                """)
         else:
             st.info("👆 Convert some text to see the audio player")
             st.markdown("""
             **🎵 Audio Player Features:**
             - 🎤 6 different voice styles to choose from
-            - 🔄 Auto-advance with duration estimation
-            - 📊 Audio format selection (MP3, WAV, OGG)
-            - ⏮️⏭️ Easy chunk navigation
-            - 💾 Download individual chunks or complete audio
-            - 🎵 Playlist-style audio management
+            - 🎵 Seamless audio playback without interruptions
+            - 📊 Multiple audio format support (MP3, WAV, OGG)
+            - 💾 Easy download for offline listening
+            - � Mobile-optimized player controls
+            - 🔊 Optional auto-play functionality
             """)
     
     # Instructions section
@@ -454,20 +407,20 @@ You can paste any text here, and the application will automatically split it int
         - **Shimmer**: Soft and gentle - perfect for meditation or relaxation
         
         ### ✨ Advanced Features
-        - ✅ **Smart Text Chunking**: Automatically splits long texts at sentence boundaries
+        - ✅ **Smart Text Processing**: Automatically handles long texts with intelligent processing
         - ✅ **Parallel Processing**: Faster generation with multi-threaded conversion
+        - ✅ **Seamless Audio**: Creates continuous, uninterrupted audio playback
         - ✅ **Mobile-Optimized**: Responsive design works perfectly on phones
         - ✅ **Multiple Audio Formats**: Choose between MP3, WAV, and OGG formats
-        - ✅ **Auto-Advance**: Automatically suggests moving to next chunk with duration estimation
-        - ✅ **Playlist Management**: Easy navigation between audio chunks
+        - ✅ **Auto-Play Option**: Automatically start playing audio after conversion
         - ✅ **Secure Credentials**: API keys are completely hidden and secure
         - ✅ **Progress Tracking**: Real-time feedback during audio generation
-        - ✅ **Download Options**: Save individual chunks or complete audio files
+        - ✅ **Easy Downloads**: Save complete audio files with one click
         
         ### 🎛️ Audio Controls
-        - **Auto-Advance**: Enable to get prompts to move to next chunk after estimated duration
+        - **Auto-Play**: Enable to automatically start playing audio after conversion
         - **Format Selection**: Choose the best audio format for your needs
-        - **Manual Navigation**: Use Previous/Next buttons for full control
+        - **Browser Controls**: Use your browser's native audio controls for full playback control
         - **Audio Info**: View technical details about your generated audio
         
         ### 📱 Mobile Usage Tips
@@ -481,12 +434,13 @@ You can paste any text here, and the application will automatically split it int
     with st.expander("🚀 Performance & Tips", expanded=False):
         st.markdown("""
         ### ⚡ Performance Optimization
-        - **Chunk Size**: Texts are automatically split into ~6000 character chunks (GPT-4o mini TTS limit: 2000 tokens ≈ 6000-8000 chars)
-        - **Parallel Processing**: Multiple chunks are generated simultaneously for faster results
+        - **Smart Processing**: Texts are automatically processed in optimal segments for best quality
+        - **Parallel Generation**: Multiple parts are generated simultaneously for faster results
+        - **Seamless Combining**: Audio parts are seamlessly merged into continuous speech
         - **Memory Efficient**: Audio data is streamed efficiently without excessive memory usage
         
         ### 💡 Pro Tips
-        - **Long Documents**: For very long texts, consider breaking them into sections manually
+        - **Long Documents**: The app automatically handles long texts - just paste and convert!
         - **Voice Testing**: Try different voices with the same text to find your preferred style
         - **Mobile Downloads**: Audio files can be saved directly to your phone for offline listening
         - **Browser Compatibility**: Works best in modern browsers with HTML5 audio support
@@ -526,8 +480,7 @@ You can paste any text here, and the application will automatically split it int
         st.markdown("Azure OpenAI TTS API")
     
     with col_footer3:
-        st.markdown("**📱 Mobile Ready**")
-        st.markdown("Optimized for all devices")
-
+        st.markdown("**🔗 Github**")
+        st.markdown("[View the Repository](https://github.com/EfeSenerr/podcast-maker-tts)")
 if __name__ == "__main__":
     main()
